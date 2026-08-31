@@ -37,14 +37,26 @@ module.exports = async (req, res) => {
   try {
     const supabase = getServiceClient();
 
+    const authHeader = req.headers.authorization || "";
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+
     if (req.method === "GET") {
-      const { data, error } = await supabase.from("properties").select("*").order("created_at", { ascending: false });
+      let query = supabase.from("properties").select("*").order("created_at", { ascending: false });
+      if (req.query && req.query.mine === "true") {
+        if (!token) {
+          return res.status(401).json({ ok: false, error: "You must be logged in as an owner." });
+        }
+        const { data: userData, error: userError } = await supabase.auth.getUser(token);
+        if (userError || !userData?.user) {
+          return res.status(401).json({ ok: false, error: "Invalid or expired session." });
+        }
+        query = query.eq("owner_id", userData.user.id);
+      }
+      const { data, error } = await query;
       if (error) throw error;
       return res.status(200).json({ ok: true, properties: data || [] });
     }
 
-    const authHeader = req.headers.authorization || "";
-    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
     if (!token) {
       return res.status(401).json({ ok: false, error: "You must be logged in as an owner." });
     }

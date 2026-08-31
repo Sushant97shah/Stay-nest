@@ -20,9 +20,17 @@
     </nav>
     <div class="header-actions">
       <button class="btn btn-ghost" data-view="owner">For owners</button>
-      <button class="menu-btn" data-action="menu" aria-label="Open menu">☰</button>
+      <button class="menu-btn" aria-label="Open menu">☰</button>
     </div>
   </header>
+
+  <div class="mobile-nav" id="mobile-nav" aria-label="Mobile navigation">
+    <button class="mobile-nav-close" data-action="close-menu" aria-label="Close menu">×</button>
+    <a href="#explore" data-action="close-menu">Find a stay</a>
+    <a href="#how-it-works" data-action="close-menu">How it works</a>
+    <a href="#owner" data-action="close-menu">List your property →</a>
+  </div>
+  <div class="mobile-nav-scrim" data-action="close-menu"></div>
 
   <main id="app">
     <section id="home" class="hero">
@@ -50,9 +58,10 @@
         <button class="filter-chip active" data-filter="all">All stays</button><button class="filter-chip" data-filter="co-living">Co-living</button><button class="filter-chip" data-filter="hostel">Hostels</button><button class="filter-chip" data-filter="pg">PGs</button>
         <select id="sort-stays" class="sort-select"><option value="recommended">Recommended</option><option value="price">Price: low to high</option><option value="rating">Top rated</option></select>
       </div>
-      <div class="map-panel" id="map-panel" aria-label="Map based discovery"></div>
+      <div class="map-panel" id="map-panel" aria-label="Find PGs near your current location"></div>
       <div class="listing-grid" id="listing-grid"></div>
       <div class="empty-state hidden" id="empty-state"><span>⌕</span><h3>No stays found</h3><p>Try another locality or remove a filter.</p></div>
+      <button class="btn btn-ghost load-more hidden" id="load-more">Load more stays ↓</button>
     </section>
 
     <section class="feature-band" id="how-it-works"><div class="section-heading"><div><span class="eyebrow">SIMPLE BY DESIGN</span><h2>Compare with confidence</h2></div></div><div class="steps"><div class="step"><span>01</span><h3>Discover</h3><p>Browse Google listing photos, locations and review counts for Bangalore PGs.</p></div><div class="step"><span>02</span><h3>Shortlist</h3><p>Compare only the rent, amenities and house details that are actually listed.</p></div><div class="step"><span>03</span><h3>Review</h3><p>Read Google reviews and share your own experience on a property page.</p></div></div></section>
