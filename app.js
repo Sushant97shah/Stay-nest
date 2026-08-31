@@ -7,7 +7,10 @@ const STORAGE_KEYS = {
   ownerProfile: "staynest-owner-profile",
   wishlist: "staynest-wishlist"
 };
-const baseDataset = Array.isArray(window.BANGALORE_PGS) ? window.BANGALORE_PGS : [];
+const baseDataset = [
+  ...(Array.isArray(window.BANGALORE_PGS) ? window.BANGALORE_PGS : []),
+  ...(Array.isArray(window.INDIA_PGS) ? window.INDIA_PGS : [])
+];
 const ownerSeed = [
   { id: "owner-1", name: "Sushant Residency", area: "Koramangala", city: "Bengaluru", type: "pg", rent: 12000, image: "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=900&q=85", phone: "9876543210", status: "Live", roomsAvailable: 8 },
   { id: "owner-2", name: "Sunrise Co-Living", area: "HSR Layout", city: "Bengaluru", type: "co-living", rent: 15500, image: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=900&q=85", phone: "9988776655", status: "Live", roomsAvailable: 4 },
@@ -87,7 +90,7 @@ const getCombinedStays = () => {
     ...pg,
     id: pg.id || index + 1,
     name: pg.name || NOT_LISTED,
-    location: `${pg.area || pg.locality || "Bengaluru"}, Bengaluru`,
+    location: `${pg.area || pg.locality || "Bengaluru"}, ${pg.city || "Bengaluru"}`,
     type: pg.type || "pg",
     rent: typeof pg.priceSingleSharing === "number" && pg.priceSingleSharing > 0 ? pg.priceSingleSharing : null,
     rooms: "Single / Double / Triple / 4 Sharing",
@@ -95,6 +98,7 @@ const getCombinedStays = () => {
     image: pg.coverImage || pg.image || "",
     verified: pg.verified === true,
     area: pg.area || pg.locality || "Bengaluru",
+    city: pg.city || "Bengaluru",
     rating: pg.rating || 4.6,
     reviews: pg.reviews || 0,
     latitude: typeof pg.latitude === "number" ? pg.latitude : null,
@@ -734,7 +738,8 @@ async function showOwnerDashboard() {
         <h3>Add a new property</h3>
         <form class="owner-form" id="owner-form">
           <label>Property name<input required name="name" placeholder="e.g. Sunrise PG"></label>
-          <label>Locality and city<input required name="area" placeholder="e.g. Baner, Pune"></label>
+          <label>Locality<input required name="area" placeholder="e.g. Baner"></label>
+          <label>City<input required name="city" placeholder="e.g. Pune"></label>
           <label>Property type<select name="type"><option value="pg">PG</option><option value="hostel">Hostel</option><option value="co-living">Co-living</option></select></label>
           <label>Starting monthly rent<input required type="number" name="rent" placeholder="9000"></label>
           <label>Owner phone number<input required name="phone" placeholder="10-digit number"></label>
@@ -789,7 +794,7 @@ async function showOwnerDashboard() {
     const payload = {
       name: String(form.get("name") || "").trim(),
       area: String(form.get("area") || "").trim(),
-      city: "Bengaluru",
+      city: String(form.get("city") || "").trim() || "Bengaluru",
       type: String(form.get("type") || "pg"),
       rent: Number(form.get("rent") || 0),
       phone: String(form.get("phone") || "").trim(),
