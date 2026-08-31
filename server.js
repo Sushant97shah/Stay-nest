@@ -17,6 +17,25 @@ const fs = require("fs");
 const path = require("path");
 
 const root = __dirname;
+
+// Vercel injects configured env vars automatically in production; locally we
+// need to read .env ourselves since there's no dotenv dependency in this
+// project. Existing values (e.g. already-exported shell vars) win.
+function loadDotEnv() {
+  const envPath = path.join(root, ".env");
+  if (!fs.existsSync(envPath)) return;
+  const raw = fs.readFileSync(envPath, "utf8");
+  for (const line of raw.split(/\r?\n/)) {
+    const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/);
+    if (!match) continue;
+    const [, key, value] = match;
+    if (!process.env[key]) {
+      process.env[key] = value.replace(/^['"]|['"]$/g, "");
+    }
+  }
+}
+loadDotEnv();
+
 const PORT = process.env.PORT || 3000;
 
 const API_ROUTES = {
