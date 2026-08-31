@@ -92,9 +92,9 @@ function loadEnvFromFile() {
       if (!match) continue;
       const [, key, value] = match;
       const trimmed = value.replace(/^['"]|['"]$/g, '');
-      if (!process.env[key]) {
-        process.env[key] = trimmed;
-      }
+      // .env is this project's source of truth -- it should win over any
+      // stray same-named variable already sitting in the OS environment.
+      process.env[key] = trimmed;
     }
   }
 }

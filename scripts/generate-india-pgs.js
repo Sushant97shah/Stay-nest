@@ -67,9 +67,9 @@ function loadEnvFromFile() {
       if (!match) continue;
       const [, key, value] = match;
       const trimmed = value.replace(/^['"]|['"]$/g, '');
-      if (!process.env[key]) {
-        process.env[key] = trimmed;
-      }
+      // .env is this project's source of truth -- it should win over any
+      // stray same-named variable already sitting in the OS environment.
+      process.env[key] = trimmed;
     }
   }
 }
@@ -132,12 +132,18 @@ function parseRoomPricesFromText(text, fallback) {
       const amount = normalizePriceNumber(match[2]);
       if (amount) result[pattern.key] = amount;
     }
-    if (!result[pattern.key]) {
-      const startsAtMatch = cleanedText.match(new RegExp(`starts?\\s*(?:at|from)?[^0-9]{0,30}([0-9][0-9,]{2,8})`, 'i'));
-      if (startsAtMatch && startsAtMatch[1]) {
-        const amount = normalizePriceNumber(startsAtMatch[1]);
-        if (amount) result[pattern.key] = amount;
-      }
+  }
+
+  // A generic "starting at / from / bare ₹X per month" mention is an
+  // entry-level price, not tier-specific -- only use it to fill "single"
+  // when nothing more specific matched above.
+  if (!result.single) {
+    const genericMatch =
+      cleanedText.match(/(?:start(?:ing|s)?\s*(?:at|from)?|from)\s*(?:₹|Rs\.?|INR)?\s*([0-9][0-9,]{2,8})\s*(?:\/|per)?\s*month/i) ||
+      cleanedText.match(/(?:₹|Rs\.?|INR)\s*([0-9][0-9,]{2,8})\s*(?:\/|per)?\s*month/i);
+    if (genericMatch && genericMatch[1]) {
+      const amount = normalizePriceNumber(genericMatch[1]);
+      if (amount) result.single = amount;
     }
   }
 
@@ -225,20 +231,40 @@ async function fetchPlacePhotos(placeName, details = {}) {
   return gallery;
 }
 
+const TAVILY_MIN_INTERVAL_MS = 1500;
+let lastTavilyCallAt = 0;
+
 async function getTavilyBreadth(propertyName, locality) {
   const apiKey = process.env.TAVILY_API_KEY || process.env.TAVILY_KEY;
   if (!apiKey) return { answer: '', results: [] };
   const searchTerm = `${propertyName} ${locality} PG rent price monthly sharing`;
-  try {
-    const payload = await requestJson('https://api.tavily.com/search', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: { api_key: apiKey, query: searchTerm, max_results: 5, include_answer: true }
-    });
-    return payload || { answer: '', results: [] };
-  } catch (error) {
-    return { answer: '', results: [] };
+
+  // Tavily's dev-tier plan enforces a short-window rate limit (separate from
+  // the total credit pool) -- space calls out and retry once on a 429/432
+  // instead of silently giving up on the first transient rate-limit hit.
+  const waitFor = TAVILY_MIN_INTERVAL_MS - (Date.now() - lastTavilyCallAt);
+  if (waitFor > 0) await sleep(waitFor);
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    lastTavilyCallAt = Date.now();
+    try {
+      const payload = await requestJson('https://api.tavily.com/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+        body: { api_key: apiKey, query: searchTerm, max_results: 5, include_answer: true }
+      });
+      return payload || { answer: '', results: [] };
+    } catch (error) {
+      const isRateLimit = /\b(429|432)\b/.test(error.message);
+      if (process.env.DEBUG_TAVILY) console.error(`  [tavily debug] "${searchTerm}" failed: ${error.message}`);
+      if (isRateLimit && attempt === 0) {
+        await sleep(4000);
+        continue;
+      }
+      return { answer: '', results: [] };
+    }
   }
+  return { answer: '', results: [] };
 }
 
 function extractWebPricing(tavilyData) {
@@ -299,6 +325,10 @@ async function buildCityDataset(cityName, startId) {
 
       const tavilyData = await getTavilyBreadth(entry.name, area);
       const webPricing = extractWebPricing(tavilyData);
+      if (process.env.DEBUG_TAVILY) {
+        const rawText = [tavilyData.answer || '', ...(tavilyData.results || []).map((r) => r.content || r.title || '')].join(' | ');
+        console.error(`  [debug] ${entry.name}: answer="${(tavilyData.answer || '').slice(0, 150)}" results=${(tavilyData.results || []).length} textLen=${rawText.length} webPricing=${JSON.stringify(webPricing)}`);
+      }
       const commonAmenities = ['Wi-Fi', 'Hot water', 'Fridge', 'Drinking water', 'Washing machine'];
       const extraAmenities = extractWebAmenities(tavilyData).filter((amenity) => !commonAmenities.includes(amenity));
 

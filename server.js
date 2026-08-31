@@ -20,7 +20,8 @@ const root = __dirname;
 
 // Vercel injects configured env vars automatically in production; locally we
 // need to read .env ourselves since there's no dotenv dependency in this
-// project. Existing values (e.g. already-exported shell vars) win.
+// project. .env is this project's source of truth, so it wins over any
+// stray same-named variable already sitting in the OS environment.
 function loadDotEnv() {
   const envPath = path.join(root, ".env");
   if (!fs.existsSync(envPath)) return;
@@ -29,9 +30,7 @@ function loadDotEnv() {
     const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/);
     if (!match) continue;
     const [, key, value] = match;
-    if (!process.env[key]) {
-      process.env[key] = value.replace(/^['"]|['"]$/g, "");
-    }
+    process.env[key] = value.replace(/^['"]|['"]$/g, "");
   }
 }
 loadDotEnv();
