@@ -944,9 +944,17 @@ window.addEventListener("popstate", maybeOpenHashStay);
 // Boot
 // ---------------------------------------------------------------------------
 
+function applyQueryParamSearch() {
+  const query = new URLSearchParams(location.search).get("q");
+  if (!query) return;
+  const field = document.querySelector("#filter-location");
+  if (field) field.value = query;
+}
+
 async function init() {
   renderHeaderUser();
   renderMapPanel();
+  applyQueryParamSearch();
   resetAndRender();
   if (window.supabase) {
     await loadSupabaseConfig();
