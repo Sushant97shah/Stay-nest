@@ -1,0 +1,12 @@
+{
+  "name": "staynest",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "node --check app.js && node --check api/config.js && node --check api/owner-auth.js && node --check api/properties.js",
+    "dev": "npx serve ."
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4"
+  }
+}
