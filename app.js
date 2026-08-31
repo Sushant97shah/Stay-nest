@@ -622,7 +622,7 @@ async function showDetail(id) {
   const reviewMarkup = reviews.length ? reviews.map((review) => `<li><strong>${escapeHtml(review.name)}</strong> · ${"★".repeat(Number(review.rating || 5))}<br>${escapeHtml(review.text)}</li>`).join("") : `<li>${NOT_LISTED}</li>`;
   const imageMarkup = cover ? `<img src="${cover}" alt="${escapeHtml(stay.name)}" class="photo-thumb main-photo">` : `<div class="missing-image">${NOT_LISTED}</div>`;
   const propertyMeta = `${stay.area || stay.locality || "Bengaluru"} · ${stay.address || stay.location || "Bengaluru"}`;
-  openModal(`<div class="detail-head">${imageMarkup}<div><span class="eyebrow">VERIFIED STAY</span><h2>${escapeHtml(stay.name)}</h2>
+  openModal(`<div class="detail-head">${imageMarkup}<div class="detail-info"><span class="eyebrow">VERIFIED STAY</span><h2>${escapeHtml(stay.name)}</h2>
     <p class="location">⌖ ${escapeHtml(propertyMeta)}</p>
     <p class="rating">★ ${(stay.rating || 4.7).toFixed(1)} · ${(stay.reviews || 0).toLocaleString("en-IN")} reviews</p>
     <p class="location">Pincode: ${escapeHtml(stay.pincode || "Not listed")} · Landmark: ${escapeHtml(stay.nearestLandmark || NOT_LISTED)}</p>
