@@ -114,7 +114,7 @@ let activeFilter = "all";
 let currentPage = 1;
 let searchDebounceTimer = null;
 let wishlistCache = new Set();
-let state = { authMode: "tenant", supabase: null, config: null, dbProperties: [], supabaseUserId: null };
+let state = { authMode: "tenant", tenantAuthMethod: "phone", supabase: null, config: null, dbProperties: [], supabaseUserId: null };
 
 async function loadSupabaseConfig() {
   try {
@@ -129,16 +129,33 @@ async function loadSupabaseConfig() {
     });
     const { data } = await state.supabase.auth.getSession();
     if (data.session) {
-      const metaRole = data.session.user?.user_metadata?.role;
-      state.supabaseUserId = data.session.user.id;
+      const user = data.session.user;
+      const metaRole = user?.user_metadata?.role;
+      const role = metaRole || (user?.email && !user?.phone ? "owner" : "tenant");
+      const name = user?.user_metadata?.full_name || user?.email || "Owner";
+      state.supabaseUserId = user.id;
       setUserSession({
-        name: data.session.user?.user_metadata?.full_name || data.session.user?.email || "Owner",
-        email: data.session.user?.email,
-        phone: data.session.user?.phone,
-        role: metaRole || (data.session.user?.phone ? "tenant" : "owner"),
+        name,
+        email: user?.email,
+        phone: user?.phone,
+        role,
         accessToken: data.session.access_token
       });
       renderHeaderUser();
+      if (role === "tenant") {
+        // Covers the magic-link flow: there's no separate "verify" step for
+        // email sign-in (the link itself completes the session), so this is
+        // the first point after a fresh email sign-in where we can upsert
+        // the tenant's profile row.
+        state.supabase.from("profiles").upsert({
+          id: user.id,
+          full_name: name,
+          role: "tenant",
+          ...(user?.phone ? { phone: user.phone } : {}),
+          ...(user?.email ? { email: user.email } : {}),
+          updated_at: new Date().toISOString()
+        }).then(() => {}, () => {});
+      }
     }
   } catch (error) {
     state.config = null;
@@ -420,6 +437,7 @@ async function ownerAuthRequest(email, password, name) {
 function openLoginModal(mode = "tenant") {
   state.authMode = mode;
   const isOwner = mode === "owner";
+  const tenantMethod = state.tenantAuthMethod === "email" ? "email" : "phone";
   const form = `
     <div class="auth-card">
       <div class="auth-header">
@@ -438,18 +456,30 @@ function openLoginModal(mode = "tenant") {
         <button class="btn btn-dark auth-submit" type="submit">${state.supabase ? "Sign up / Sign in" : "Create owner account"}</button>
       </form>
       ` : `
+      <div class="auth-toggle">
+        <button class="auth-tab ${tenantMethod === "phone" ? "active" : ""}" data-auth-method="phone" type="button">📱 Phone</button>
+        <button class="auth-tab ${tenantMethod === "email" ? "active" : ""}" data-auth-method="email" type="button">✉️ Email</button>
+      </div>
       <form id="auth-form" class="auth-form">
-        <label>Mobile number<input required type="tel" name="phone" placeholder="Enter 10-digit mobile number" maxlength="10"></label>
+        ${tenantMethod === "phone"
+          ? `<label>Mobile number<input required type="tel" name="phone" placeholder="Enter 10-digit mobile number" maxlength="10"></label>`
+          : `<label>Email<input required type="email" name="email" placeholder="you@email.com"></label>`}
         <label>Name<input required name="name" placeholder="Full name"></label>
         <button class="btn btn-dark auth-submit" type="submit">${state.supabase ? "Send OTP" : "Continue"}</button>
       </form>
-      <p class="otp-copy">${state.supabase ? "We'll text you a 6-digit verification code." : "Phone login needs the backend configured — ask the site admin."}</p>
+      <p class="otp-copy">${state.supabase ? `We'll ${tenantMethod === "phone" ? "text you a 6-digit verification code." : "email you a sign-in link — click it to log in."}` : "OTP login needs the backend configured — ask the site admin."}</p>
       `}
     </div>
   `;
   openModal(form);
-  document.querySelectorAll(".auth-tab").forEach((button) => {
+  document.querySelectorAll(".auth-tab[data-auth-mode]").forEach((button) => {
     button.addEventListener("click", () => openLoginModal(button.dataset.authMode));
+  });
+  document.querySelectorAll(".auth-tab[data-auth-method]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.tenantAuthMethod = button.dataset.authMethod;
+      openLoginModal("tenant");
+    });
   });
   document.querySelector("#auth-form").addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -492,27 +522,49 @@ function openLoginModal(mode = "tenant") {
       return;
     }
 
-    const phone = String(form.get("phone") || "").replace(/\D/g, "");
     const name = String(form.get("name") || "").trim();
-    if (phone.length !== 10 || !name) return;
+    if (!name) return;
 
     if (!state.supabase) {
-      alert("Phone login needs the backend to be configured (Supabase keys not set yet).");
+      alert("OTP login needs the backend to be configured (Supabase keys not set yet).");
       return;
     }
 
     submitBtn.disabled = true;
-    const e164Phone = `+91${phone}`;
     try {
-      const { error } = await state.supabase.auth.signInWithOtp({ phone: e164Phone });
-      if (error) throw error;
-      openOtpVerifyModal({ phone: e164Phone, name });
+      if (tenantMethod === "phone") {
+        const phone = String(form.get("phone") || "").replace(/\D/g, "");
+        if (phone.length !== 10) { submitBtn.disabled = false; return; }
+        const e164Phone = `+91${phone}`;
+        const { error } = await state.supabase.auth.signInWithOtp({ phone: e164Phone, options: { data: { role: "tenant", full_name: name } } });
+        if (error) throw error;
+        openOtpVerifyModal({ phone: e164Phone, name });
+      } else {
+        const email = String(form.get("email") || "").trim();
+        if (!email) { submitBtn.disabled = false; return; }
+        const { error } = await state.supabase.auth.signInWithOtp({
+          email,
+          options: { shouldCreateUser: true, data: { role: "tenant", full_name: name }, emailRedirectTo: window.location.origin }
+        });
+        if (error) throw error;
+        showCheckEmailModal({ email });
+      }
     } catch (error) {
-      alert(error.message || "Could not send OTP. Make sure an SMS provider is configured in Supabase Auth settings.");
+      alert(error.message || `Could not send OTP. Make sure ${tenantMethod === "phone" ? "an SMS provider is configured in Supabase Auth settings" : "email sign-in is enabled in Supabase Auth settings"}.`);
     } finally {
       submitBtn.disabled = false;
     }
   });
+}
+
+function showCheckEmailModal({ email }) {
+  openModal(`
+    <div class="auth-card">
+      <div class="auth-header"><span class="eyebrow">CHECK YOUR EMAIL</span><h2>Sign-in link sent</h2></div>
+      <p class="otp-copy">We emailed a sign-in link to <strong>${escapeHtml(email)}</strong>. Open that email and click the link to finish signing in.</p>
+      <p class="otp-copy">If you opened the link in a new tab, you can close this one — you'll already be signed in there. Didn't get it? Check spam, or close this and try again.</p>
+    </div>
+  `);
 }
 
 function openOtpVerifyModal({ phone, name }) {
@@ -541,7 +593,13 @@ function openOtpVerifyModal({ phone, name }) {
         updated_at: new Date().toISOString()
       });
       state.supabaseUserId = user.id;
-      setUserSession({ name, phone, role: "tenant", verifiedAt: Date.now(), accessToken: data.session?.access_token || "" });
+      setUserSession({
+        name,
+        role: "tenant",
+        verifiedAt: Date.now(),
+        accessToken: data.session?.access_token || "",
+        phone
+      });
       renderHeaderUser();
       await loadWishlist();
       closeModal();
