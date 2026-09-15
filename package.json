@@ -1,12 +1,30 @@
 {
   "name": "staynest",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "private": true,
   "scripts": {
-    "test": "node --check server.js && node --check app.js && node --check api/config.js && node --check api/owner-auth.js && node --check api/properties.js && node --check api/enquiries.js && node --check scripts/generate-india-pgs.js",
-    "dev": "node server.js"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "start:standalone": "node .next/standalone/server.js",
+    "lint": "eslint",
+    "migrate-photos": "tsx scripts/migrate-photos-to-storage.ts"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.45.4"
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.116.0",
+    "next": "16.3.5",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "server-only": "^0.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.5",
+    "tsx": "^4.23.13",
+    "typescript": "^5"
   }
 }
