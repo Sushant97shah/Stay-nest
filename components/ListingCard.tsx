@@ -14,7 +14,7 @@ export function ListingCard({
 }) {
   return (
     <article className="listing-card" style={{ position: "relative" }}>
-      <Link href={`/pg/${stay.id}`} style={{ display: "contents" }}>
+      <Link href={`/pg/${stay.id}`} style={{ display: "contents", color: "inherit", textDecoration: "none" }}>
         <div className="listing-image">
           {stay.image && (
             <Image

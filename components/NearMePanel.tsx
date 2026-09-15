@@ -83,7 +83,12 @@ export function NearMePanel({ stays }: { stays: Stay[] }) {
           </div>
           <div className="nearme-list">
             {state.stays.map((stay) => (
-              <Link className="nearme-item" href={`/pg/${stay.id}`} key={stay.id}>
+              <Link
+                className="nearme-item"
+                href={`/pg/${stay.id}`}
+                key={stay.id}
+                style={{ color: "inherit", textDecoration: "none" }}
+              >
                 <div
                   className="nearme-thumb"
                   style={stay.image ? { backgroundImage: `url('${stay.image}')` } : undefined}
